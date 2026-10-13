@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sales coverage map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --ink: #17211e;
+      --muted: #5e675f;
+      --paper: #f4f0e7;
+      --panel: #f7f4ee;
+      --line: #ddd4c4;
+      --teal: #0f5f5c;
+      --teal-soft: #e5f1ef;
+      --amber: #a85d12;
+      --white: #fffcf8;
+      --shadow: 0 10px 28px rgba(23, 33, 30, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      font: 15px/1.45 ui-sans-serif, "Segoe UI", sans-serif;
+      background: var(--paper);
+    }
+
+    button, input { font: inherit; color: inherit; }
+
+    :focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+
+    .banner {
+      background: var(--ink);
+      color: #f3efe6;
+      flex: 0 0 auto;
+      font-size: 13px;
+      letter-spacing: 0.01em;
+      padding: 8px 18px;
+      text-align: center;
+    }
+
+    .app {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      width: 372px;
+    }
+
+    .panel-body {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+      overflow: auto;
+      padding: 18px 18px 12px;
+    }
+
+    .eyebrow {
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      margin: 0 0 6px;
+      text-transform: uppercase;
+    }
+
+    .title-row {
+      align-items: center;
+      display: flex;
+      gap: 10px;
+    }
+
+    h1 {
+      font-family: Georgia, "Iowan Old Style", Palatino, serif;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .pill {
+      background: var(--teal-soft);
+      border-radius: 999px;
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 4px 8px;
+      text-transform: uppercase;
+    }
+
+    .lede {
+      color: var(--muted);
+      margin: 8px 0 0;
+    }
+
+    .stats {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .stat {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 8px 7px;
+    }
+
+    .stat b {
+      display: block;
+      font-family: Georgia, "Iowan Old Style", Palatino, serif;
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .stat span {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .stat.contacts b { color: var(--teal); }
+    .stat.gaps b { color: var(--amber); }
+
+    .stat-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin: -6px 0 0;
+    }
+
+    .block h2,
+    .detail-dock h2 {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin: 0 0 8px;
+      text-transform: uppercase;
+    }
+
+    .search { position: relative; }
+
+    .search input {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      width: 100%;
+    }
+
+    .results {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      left: 0;
+      margin: 0;
+      max-height: 240px;
+      overflow: auto;
+      padding: 4px;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 20;
+    }
+
+    .results[hidden] { display: none; }
+
+    .results button {
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px;
+      text-align: left;
+      width: 100%;
+    }
+
+    .results button[aria-selected="true"],
+    .results button:hover { background: #efeae0; }
+
+    .results small { color: var(--muted); }
+
+    .chips, .layers { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .chip, .text-btn, .layer {
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .chip {
+      align-items: center;
+      display: inline-flex;
+      font-size: 12px;
+      font-weight: 600;
+      gap: 6px;
+      padding: 6px 10px;
+    }
+
+    .chip[aria-pressed="true"] {
+      background: var(--teal);
+      border-color: var(--teal);
+      color: white;
+    }
+
+    .chip i, .legend i {
+      border-radius: 50%;
+      display: inline-block;
+      height: 8px;
+      width: 8px;
+    }
+
+    .chip[aria-pressed="true"] i { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7); }
+
+    .layers { flex-direction: column; gap: 4px; }
+
+    .layer {
+      align-items: center;
+      border-radius: 10px;
+      display: flex;
+      gap: 10px;
+      padding: 8px 10px;
+      text-align: left;
+      width: 100%;
+    }
+
+    .layer:hover { background: rgba(255, 255, 255, 0.7); }
+
+    .switch {
+      background: #d5cec2;
+      border-radius: 99px;
+      flex: 0 0 auto;
+      height: 20px;
+      position: relative;
+      width: 36px;
+    }
+
+    .layer[aria-pressed="true"] .switch { background: var(--teal); }
+
+    .switch::after {
+      background: white;
+      border-radius: 50%;
+      content: "";
+      height: 16px;
+      left: 2px;
+      position: absolute;
+      top: 2px;
+      width: 16px;
+    }
+
+    .layer[aria-pressed="true"] .switch::after { transform: translateX(16px); }
+
+    .row-between {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .text-btn {
+      border-radius: 8px;
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+
+    .text-btn:hover { background: white; }
+
+    .legend {
+      display: grid;
+      gap: 6px;
+    }
+
+    .legend div {
+      align-items: center;
+      color: var(--muted);
+      display: flex;
+      font-size: 13px;
+      gap: 8px;
+    }
+
+    .size-key {
+      align-items: end;
+      display: flex;
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    .size-key span {
+      align-items: center;
+      color: var(--muted);
+      display: flex;
+      font-size: 12px;
+      gap: 6px;
+    }
+
+    .size-key i {
+      background: var(--teal);
+      border: 1.5px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(15, 95, 92, 0.25);
+      display: inline-block;
+    }
+
+    .size-key.is-off { opacity: 0.4; }
+
+    .gap-swatch {
+      border: 2px dashed var(--amber);
+      border-radius: 50%;
+      height: 12px;
+      width: 12px;
+    }
+
+    .detail-dock {
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      flex: 0 0 auto;
+      max-height: 42%;
+      overflow: auto;
+      padding: 12px 18px 16px;
+    }
+
+    .detail {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+
+    .detail h3 {
+      font-family: Georgia, "Iowan Old Style", Palatino, serif;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .detail .place { color: var(--muted); margin: 2px 0 12px; }
+
+    .detail .prompt { color: var(--muted); margin: 8px 0 0; }
+
+    .metrics {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .metrics div b {
+      display: block;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metrics div span { color: var(--muted); font-size: 12px; }
+
+    .bar {
+      background: #ece7dc;
+      border-radius: 99px;
+      display: flex;
+      height: 10px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .bar span { display: block; height: 100%; }
+
+    .stage-list { display: grid; gap: 4px; margin: 10px 0 0; }
+
+    .stage-list div {
+      display: grid;
+      font-size: 13px;
+      gap: 8px;
+      grid-template-columns: 10px 1fr auto;
+      align-items: center;
+    }
+
+    .stage-list b { font-variant-numeric: tabular-nums; }
+
+    .accounts { margin: 12px 0 0; padding-left: 18px; }
+    .accounts li { margin: 2px 0; }
+
+    .gap-copy {
+      background: #fbf3e6;
+      border-radius: 8px;
+      color: #6d4310;
+      font-size: 13px;
+      margin: 0 0 12px;
+      padding: 8px 10px;
+    }
+
+    .map-wrap {
+      flex: 1;
+      min-width: 0;
+      position: relative;
+    }
+
+    #map { height: 100%; width: 100%; background: #e7e2d6; }
+
+    .map-empty {
+      background: rgba(255, 252, 248, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      left: 50%;
+      padding: 14px 16px;
+      position: absolute;
+      top: 24px;
+      transform: translateX(-50%);
+      z-index: 500;
+    }
+
+    .map-empty[hidden] { display: none; }
+
+    .tip {
+      background: var(--ink);
+      border: 0;
+      border-radius: 8px;
+      box-shadow: none;
+      color: white;
+      font: 600 12px/1.35 ui-sans-serif, system-ui, sans-serif;
+      padding: 6px 8px;
+    }
+
+    .tip::before { border-top-color: var(--ink); }
+    .tip span { display: block; font-weight: 500; opacity: 0.82; }
+
+    .hub-label { background: none; border: 0; }
+    .hub-label span {
+      background: rgba(255, 252, 248, 0.94);
+      border-radius: 999px;
+      box-shadow: 0 1px 3px rgba(23, 33, 30, 0.18);
+      color: var(--ink);
+      font: 600 11px/1.2 ui-sans-serif, system-ui, sans-serif;
+      padding: 3px 7px;
+      position: absolute;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 860px) {
+      .app { flex-direction: column; }
+      .panel { max-height: 48vh; width: 100%; border-right: 0; border-bottom: 1px solid var(--line); }
+      .map-wrap { min-height: 52vh; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .switch::after { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <p class="banner">Sample data for this preview. These figures are illustrative and do not come from a CRM.</p>
+  <div class="app">
+    <aside class="panel">
+      <div class="panel-body">
+      <header>
+        <p class="eyebrow">Municipal infrastructure</p>
+        <div class="title-row">
+          <h1>Sales coverage</h1>
+          <span class="pill">Preview</span>
+        </div>
+        <p class="lede">Manholes, lift stations, and wastewater structures across Minnesota, North Dakota, and South Dakota.</p>
+      </header>
+
+      <section class="stats" aria-label="Coverage summary">
+        <div class="stat contacts"><b id="stat-contacts">0</b><span>Contacts</span></div>
+        <div class="stat"><b id="stat-cities">0</b><span>Cities</span></div>
+        <div class="stat"><b id="stat-deals">0</b><span>Open deals</span></div>
+        <div class="stat gaps"><b id="stat-gaps">0</b><span>Uncovered</span></div>
+      </section>
+      <p class="stat-note">Open deals are New, Engaged, Proposal, and Bid.</p>
+
+      <section class="block search">
+        <h2>City</h2>
+        <input id="search" type="search" placeholder="Search cities" autocomplete="off" aria-controls="search-results" aria-expanded="false">
+        <div id="search-results" class="results" role="listbox" hidden></div>
+      </section>
+
+      <section class="block">
+        <div class="row-between">
+          <h2>State</h2>
+          <button type="button" class="text-btn" id="reset-filters">Reset filters</button>
+        </div>
+        <div id="state-filters" class="chips" role="group" aria-label="State"></div>
+      </section>
+
+      <section class="block">
+        <h2>Deal stage</h2>
+        <div id="stage-filters" class="chips" role="group" aria-label="Deal stage"></div>
+      </section>
+
+      <section class="block">
+        <h2>Layers</h2>
+        <div id="layers" class="layers"></div>
+      </section>
+
+      <section class="block">
+        <h2>Legend</h2>
+        <div id="legend" class="legend"></div>
+        <div id="size-key" class="size-key" aria-hidden="true">
+          <span><i style="width:8px;height:8px"></i> Few</span>
+          <span><i style="width:14px;height:14px"></i> More</span>
+          <span><i style="width:22px;height:22px"></i> Most</span>
+        </div>
+      </section>
+
+      </div>
+      <section class="detail-dock">
+        <h2>City detail</h2>
+        <div id="detail" class="detail" aria-live="polite"></div>
+      </section>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map" role="region" aria-label="Sales coverage map"></div>
+      <div id="map-empty" class="map-empty" hidden></div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const STAGES = [
+      { id: "New", color: "#3d7ea6" },
+      { id: "Engaged", color: "#1a7a6d" },
+      { id: "Proposal", color: "#2f6b45" },
+      { id: "Bid", color: "#c46a12" },
+      { id: "Won", color: "#143d36" },
+      { id: "Lost", color: "#8a8478" }
+    ];
+
+    const STATE_NAMES = { MN: "Minnesota", ND: "North Dakota", SD: "South Dakota" };
+    const OPEN_DEAL_STAGES = ["New", "Engaged", "Proposal", "Bid"];
+    const COLOR_STAGES = ["New", "Engaged", "Proposal", "Bid", "Won"];
+
+    const HUBS = {
+      "Rochester|MN": "right",
+      "Duluth|MN": "right",
+      "St. Cloud|MN": "left",
+      "Fargo|ND": "above",
+      "Sioux Falls|SD": "right"
+    };
+
+    // city, state, lat, lng, contacts, [New, Engaged, Proposal, Bid, Won, Lost], gap
+    const RAW = [
+      ["Minneapolis", "MN", 44.9778, -93.2650, 78, [2, 3, 4, 3, 8, 2]],
+      ["St. Paul", "MN", 44.9537, -93.0900, 52, [2, 3, 3, 2, 6, 1]],
+      ["Bloomington", "MN", 44.8408, -93.2983, 24, [1, 2, 2, 1, 4, 1]],
+      ["Plymouth", "MN", 45.0105, -93.4555, 18, [1, 2, 4, 1, 1, 0]],
+      ["Minnetonka", "MN", 44.9133, -93.5033, 16, [1, 1, 3, 1, 1, 0]],
+      ["Eden Prairie", "MN", 44.8547, -93.4708, 16, [1, 1, 2, 4, 1, 1]],
+      ["Maple Grove", "MN", 45.0725, -93.4558, 14, [1, 1, 3, 1, 0, 0]],
+      ["Brooklyn Park", "MN", 45.0941, -93.3563, 12, [1, 3, 1, 0, 1, 0]],
+      ["Eagan", "MN", 44.8041, -93.1669, 14, [1, 1, 1, 3, 1, 0]],
+      ["Woodbury", "MN", 44.9239, -92.9594, 14, [1, 1, 2, 4, 1, 1]],
+      ["Burnsville", "MN", 44.7677, -93.2777, 12, [1, 1, 3, 1, 0, 1]],
+      ["Edina", "MN", 44.8897, -93.3499, 12, [0, 1, 3, 1, 1, 0]],
+      ["Lakeville", "MN", 44.6497, -93.2427, 10, [1, 3, 1, 1, 0, 0]],
+      ["Blaine", "MN", 45.1608, -93.2349, 10, [0, 3, 1, 0, 0, 0]],
+      ["St. Louis Park", "MN", 44.9489, -93.3480, 9, [1, 3, 1, 0, 1, 0]],
+      ["Apple Valley", "MN", 44.7319, -93.2177, 8, [1, 2, 1, 0, 0, 0]],
+      ["Coon Rapids", "MN", 45.1732, -93.3080, 8, [1, 3, 1, 0, 0, 0]],
+      ["Richfield", "MN", 44.8831, -93.2830, 7, [0, 2, 1, 0, 0, 0]],
+      ["Roseville", "MN", 45.0061, -93.1566, 8, [1, 3, 1, 0, 1, 0]],
+      ["Shakopee", "MN", 44.7974, -93.5269, 7, [1, 2, 1, 0, 0, 0]],
+      ["Fridley", "MN", 45.0861, -93.2633, 6, [0, 2, 1, 0, 0, 0]],
+      ["Maplewood", "MN", 44.9530, -93.0252, 6, [1, 2, 0, 0, 1, 0]],
+      ["Golden Valley", "MN", 44.9903, -93.3594, 6, [0, 2, 1, 0, 0, 0]],
+      ["Chaska", "MN", 44.7894, -93.6022, 6, [1, 2, 1, 0, 0, 0]],
+      ["Anoka", "MN", 45.1977, -93.3872, 6, [0, 2, 1, 0, 0, 0]],
+      ["White Bear Lake", "MN", 45.0847, -93.0099, 6, [1, 2, 1, 0, 0, 0]],
+      ["Brooklyn Center", "MN", 45.0761, -93.3327, 5, [0, 2, 0, 0, 0, 0]],
+      ["Chanhassen", "MN", 44.8622, -93.5308, 5, [1, 2, 0, 0, 0, 0]],
+      ["Andover", "MN", 45.2330, -93.2913, 5, [0, 2, 1, 0, 0, 0]],
+      ["Waconia", "MN", 44.8508, -93.7869, 5, [1, 2, 0, 0, 0, 0]],
+      ["Stillwater", "MN", 45.0564, -92.8060, 6, [1, 2, 1, 0, 1, 0]],
+      ["Hastings", "MN", 44.7433, -92.8524, 6, [0, 2, 1, 0, 0, 0]],
+
+      ["Rochester", "MN", 44.0121, -92.4802, 46, [1, 2, 3, 2, 6, 1]],
+      ["Duluth", "MN", 46.7867, -92.1005, 30, [1, 2, 2, 1, 4, 1]],
+      ["St. Cloud", "MN", 45.5579, -94.1632, 28, [1, 2, 2, 5, 2, 1]],
+      ["Mankato", "MN", 44.1636, -94.0094, 16, [0, 1, 1, 3, 1, 0]],
+      ["Moorhead", "MN", 46.8739, -96.7678, 12, [0, 1, 2, 0, 0, 0]],
+      ["Winona", "MN", 44.0554, -91.6664, 10, [0, 1, 3, 1, 0, 0]],
+      ["Bemidji", "MN", 47.4736, -94.8803, 9, [1, 3, 1, 0, 0, 0]],
+      ["Austin", "MN", 43.6666, -92.9746, 8, [1, 2, 1, 0, 0, 0]],
+      ["Brainerd", "MN", 46.3580, -94.2008, 8, [1, 2, 1, 0, 0, 0]],
+      ["Alexandria", "MN", 45.8852, -95.3775, 8, [1, 3, 1, 1, 0, 0]],
+      ["Owatonna", "MN", 44.0838, -93.2260, 8, [1, 2, 1, 0, 1, 0]],
+      ["Willmar", "MN", 45.1219, -95.0433, 8, [1, 3, 1, 0, 0, 0]],
+      ["Red Wing", "MN", 44.5625, -92.5338, 7, [1, 2, 1, 0, 1, 0]],
+      ["Northfield", "MN", 44.4583, -93.1616, 7, [1, 2, 1, 0, 0, 0]],
+      ["Faribault", "MN", 44.2947, -93.2688, 6, [2, 1, 0, 0, 1, 0]],
+      ["Albert Lea", "MN", 43.6480, -93.3683, 6, [2, 1, 0, 0, 0, 0]],
+      ["Marshall", "MN", 44.4469, -95.7886, 6, [1, 2, 0, 0, 0, 0]],
+      ["New Ulm", "MN", 44.3125, -94.4605, 6, [1, 2, 1, 0, 0, 0]],
+      ["Fergus Falls", "MN", 46.2830, -96.0776, 6, [1, 2, 0, 0, 0, 0]],
+      ["Grand Rapids", "MN", 47.2372, -93.5302, 6, [1, 2, 1, 0, 0, 0]],
+      ["Hibbing", "MN", 47.4272, -92.9377, 5, [2, 1, 0, 0, 0, 0]],
+      ["Detroit Lakes", "MN", 46.8172, -95.8453, 5, [1, 2, 0, 0, 0, 0]],
+      ["East Grand Forks", "MN", 47.9294, -97.0242, 5, [2, 1, 0, 0, 0, 0]],
+      ["Worthington", "MN", 43.6199, -95.5964, 5, [2, 1, 0, 0, 0, 0]],
+      ["Elk River", "MN", 45.3038, -93.5677, 5, [1, 2, 1, 0, 0, 0]],
+      ["Hutchinson", "MN", 44.8877, -94.3697, 5, [1, 2, 0, 0, 0, 0]],
+      ["Virginia", "MN", 47.5232, -92.5366, 4, [2, 0, 0, 0, 0, 0]],
+      ["Thief River Falls", "MN", 48.1191, -96.1814, 4, [2, 0, 0, 0, 1, 0]],
+
+      ["International Falls", "MN", 48.6011, -93.4108, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Grand Marais", "MN", 47.7505, -90.3343, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Ely", "MN", 47.9032, -91.8671, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Morris", "MN", 45.5861, -95.9139, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Ortonville", "MN", 45.3052, -96.4448, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Pipestone", "MN", 44.0005, -96.3175, 0, [0, 0, 0, 0, 0, 0], 1],
+
+      ["Fargo", "ND", 46.8772, -96.7898, 36, [1, 2, 2, 2, 5, 1]],
+      ["Grand Forks", "ND", 47.9253, -97.0329, 18, [1, 1, 1, 3, 1, 0]],
+      ["West Fargo", "ND", 46.8770, -96.9003, 10, [1, 3, 1, 0, 1, 0]],
+      ["Bismarck", "ND", 46.8083, -100.7837, 8, [0, 1, 1, 3, 1, 0]],
+      ["Jamestown", "ND", 46.9105, -98.7084, 6, [1, 2, 1, 0, 0, 0]],
+      ["Wahpeton", "ND", 46.2652, -96.6059, 5, [1, 2, 0, 0, 0, 0]],
+      ["Valley City", "ND", 46.9264, -98.0032, 4, [2, 1, 0, 0, 0, 0]],
+      ["Grafton", "ND", 48.4119, -97.4106, 3, [2, 0, 0, 0, 0, 0]],
+      ["Devils Lake", "ND", 48.1128, -98.8651, 3, [1, 0, 0, 0, 0, 1]],
+      ["Mandan", "ND", 46.8267, -100.8896, 3, [1, 0, 0, 0, 0, 0]],
+      ["Minot", "ND", 48.2325, -101.2963, 1, [0, 0, 0, 0, 0, 0], 1],
+      ["Beulah", "ND", 47.2631, -101.7779, 1, [0, 0, 0, 0, 0, 0], 1],
+      ["Dickinson", "ND", 46.8792, -102.7896, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Williston", "ND", 48.1470, -103.6180, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Watford City", "ND", 47.8022, -103.2832, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Carrington", "ND", 47.4497, -99.1262, 0, [0, 0, 0, 0, 0, 0], 1],
+
+      ["Sioux Falls", "SD", 43.5460, -96.7313, 32, [1, 2, 2, 5, 2, 1]],
+      ["Brookings", "SD", 44.3114, -96.7984, 8, [0, 1, 2, 1, 0, 0]],
+      ["Watertown", "SD", 44.8994, -97.1151, 7, [0, 1, 2, 0, 0, 0]],
+      ["Aberdeen", "SD", 45.4647, -98.4865, 6, [1, 2, 1, 0, 0, 0]],
+      ["Brandon", "SD", 43.5944, -96.5717, 5, [1, 2, 0, 0, 0, 0]],
+      ["Mitchell", "SD", 43.7094, -98.0298, 4, [1, 2, 0, 0, 0, 0]],
+      ["Yankton", "SD", 42.8711, -97.3973, 4, [2, 1, 0, 0, 0, 0]],
+      ["Harrisburg", "SD", 43.4316, -96.6973, 3, [1, 0, 0, 0, 0, 0]],
+      ["Vermillion", "SD", 42.7794, -96.9292, 3, [1, 0, 0, 0, 0, 0]],
+      ["Madison", "SD", 44.0064, -97.1142, 2, [1, 0, 0, 0, 0, 0]],
+      ["Milbank", "SD", 45.2189, -96.6353, 3, [2, 0, 0, 0, 0, 0]],
+      ["Rapid City", "SD", 44.0805, -103.2310, 1, [0, 0, 0, 0, 0, 0], 1],
+      ["Pierre", "SD", 44.3683, -100.3510, 1, [0, 0, 0, 0, 0, 0], 1],
+      ["Sisseton", "SD", 45.6644, -97.0495, 1, [0, 0, 0, 0, 0, 0], 1],
+      ["Spearfish", "SD", 44.4908, -103.8594, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Huron", "SD", 44.3633, -98.2143, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Chamberlain", "SD", 43.8108, -99.3307, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Mobridge", "SD", 45.5372, -100.4343, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Winner", "SD", 43.3767, -99.8590, 0, [0, 0, 0, 0, 0, 0], 1],
+      ["Hot Springs", "SD", 43.4314, -103.4744, 0, [0, 0, 0, 0, 0, 0], 1]
+    ];
+
+    const cities = RAW.map((row) => {
+      const [city, state, lat, lng, contacts, deals, gap] = row;
+      const dealMap = {};
+      STAGES.forEach((stage, index) => {
+        dealMap[stage.id] = deals[index] || 0;
+      });
+      return {
+        id: city + "|" + state,
+        city,
+        state,
+        lat,
+        lng,
+        contacts,
+        deals: dealMap,
+        gap: Boolean(gap)
+      };
+    });
+
+    const stageById = Object.fromEntries(STAGES.map((stage) => [stage.id, stage]));
+
+    let stateFilter = "ALL";
+    let stageFilter = "ALL";
+    let showDensity = true;
+    let showDeals = true;
+    let showGaps = true;
+    let selectedId = null;
+    let query = "";
+    let activeResult = 0;
+    let resultCities = [];
+
+    const searchInput = document.getElementById("search");
+    const searchResults = document.getElementById("search-results");
+    const detailEl = document.getElementById("detail");
+    const mapEmpty = document.getElementById("map-empty");
+    const sizeKey = document.getElementById("size-key");
+
+    const map = L.map("map", {
+      minZoom: 4,
+      maxBounds: [[38.5, -116], [51.5, -85]],
+      maxBoundsViscosity: 0.65,
+      scrollWheelZoom: true,
+      zoomControl: false
+    });
+
+    L.control.zoom({ position: "topright" }).addTo(map);
+
+    // tile.openstreetmap.org returns a 403 "Access blocked" image when a page
+    // is opened as a local file and sends no Referer. This server still uses
+    // OpenStreetMap data and returns the map without that block.
+    L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    L.control.scale({ imperial: true, metric: false }).addTo(map);
+
+    const layerGroup = L.layerGroup().addTo(map);
+
+    function dominantStage(city) {
+      let best = null;
+      let count = -1;
+      COLOR_STAGES.forEach((id) => {
+        const value = city.deals[id];
+        if (value > count) {
+          count = value;
+          best = id;
+        }
+      });
+      return count > 0 ? best : null;
+    }
+
+    function openDeals(city) {
+      return OPEN_DEAL_STAGES.reduce((sum, id) => sum + city.deals[id], 0);
+    }
+
+    function dealTotal(city) {
+      return STAGES.reduce((sum, stage) => sum + city.deals[stage.id], 0);
+    }
+
+    function isVisible(city) {
+      if (stateFilter !== "ALL" && city.state !== stateFilter) return false;
+      if (stageFilter !== "ALL") {
+        if (dominantStage(city) !== stageFilter) return false;
+      }
+      return true;
+    }
+
+    function visibleCities() {
+      return cities.filter(isVisible);
+    }
+
+    function radiusFor(contacts) {
+      return Math.round(6 + Math.sqrt(contacts) * 2.35);
+    }
+
+    function accountsFor(city) {
+      if (city.contacts <= 0) return [];
+      const options = [
+        "City of " + city.city + " Public Works",
+        city.city + " Wastewater Utility",
+        city.city + " Engineering Department"
+      ];
+      const count = city.contacts >= 20 ? 3 : city.contacts >= 6 ? 2 : 1;
+      return options.slice(0, count);
+    }
+
+    function formatNumber(value) {
+      return value.toLocaleString("en-US");
+    }
+
+    function motionDuration(seconds) {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : seconds;
+    }
+
+    function buildControls() {
+      const stateHost = document.getElementById("state-filters");
+      const states = [["ALL", "All"], ["MN", "Minnesota"], ["ND", "North Dakota"], ["SD", "South Dakota"]];
+      states.forEach(([id, label]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "chip";
+        button.textContent = label;
+        button.setAttribute("aria-pressed", id === stateFilter ? "true" : "false");
+        button.addEventListener("click", () => {
+          stateFilter = id;
+          syncPressed(stateHost, button);
+          clearSearch();
+          applyFilters({ refit: true });
+        });
+        stateHost.appendChild(button);
+      });
+
+      const stageHost = document.getElementById("stage-filters");
+      const stageOptions = [{ id: "ALL", label: "All stages", color: null }].concat(
+        COLOR_STAGES.map((id) => ({ id, label: id, color: stageById[id].color }))
+      );
+      stageOptions.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "chip";
+        button.setAttribute("aria-pressed", option.id === stageFilter ? "true" : "false");
+        if (option.color) {
+          const dot = document.createElement("i");
+          dot.style.background = option.color;
+          button.appendChild(dot);
+        }
+        button.appendChild(document.createTextNode(option.label));
+        button.addEventListener("click", () => {
+          stageFilter = option.id;
+          syncPressed(stageHost, button);
+          clearSearch();
+          applyFilters({ refit: true });
+        });
+        stageHost.appendChild(button);
+      });
+
+      const layerHost = document.getElementById("layers");
+      [
+        ["density", "Contact density", () => showDensity, (value) => { showDensity = value; }],
+        ["deals", "Deal stage", () => showDeals, (value) => { showDeals = value; }],
+        ["gaps", "Coverage gaps", () => showGaps, (value) => { showGaps = value; }]
+      ].forEach(([id, label, getValue, setValue]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "layer";
+        button.id = "layer-" + id;
+        button.setAttribute("aria-pressed", getValue() ? "true" : "false");
+        button.innerHTML = '<span class="switch" aria-hidden="true"></span>' + label;
+        button.addEventListener("click", () => {
+          setValue(!getValue());
+          button.setAttribute("aria-pressed", getValue() ? "true" : "false");
+          applyFilters({ refit: false });
+        });
+        layerHost.appendChild(button);
+      });
+
+      const legend = document.getElementById("legend");
+      COLOR_STAGES.forEach((id) => {
+        const row = document.createElement("div");
+        const swatch = document.createElement("i");
+        swatch.style.background = stageById[id].color;
+        row.appendChild(swatch);
+        row.appendChild(document.createTextNode(id));
+        legend.appendChild(row);
+      });
+      const gapRow = document.createElement("div");
+      gapRow.innerHTML = '<span class="gap-swatch"></span> Coverage gap';
+      legend.appendChild(gapRow);
+    }
+
+    function syncPressed(host, active) {
+      host.querySelectorAll("button").forEach((button) => {
+        button.setAttribute("aria-pressed", button === active ? "true" : "false");
+      });
+    }
+
+    function renderStats(list) {
+      const contacts = list.reduce((sum, city) => sum + city.contacts, 0);
+      const deals = list.reduce((sum, city) => sum + openDeals(city), 0);
+      const gaps = list.filter((city) => city.gap).length;
+      document.getElementById("stat-contacts").textContent = formatNumber(contacts);
+      document.getElementById("stat-cities").textContent = formatNumber(list.length);
+      document.getElementById("stat-deals").textContent = formatNumber(deals);
+      document.getElementById("stat-gaps").textContent = formatNumber(gaps);
+    }
+
+    function markerStyle(city, selected) {
+      if (city.gap) {
+        return {
+          radius: 13,
+          color: "#a85d12",
+          weight: selected ? 3.5 : 2.5,
+          fillColor: "#e8b15a",
+          fillOpacity: selected ? 0.28 : 0.08,
+          dashArray: "4 4"
+        };
+      }
+
+      const stage = dominantStage(city);
+      const fill = showDeals && stage ? stageById[stage].color : "#0f5f5c";
+      return {
+        radius: showDensity ? radiusFor(city.contacts) : 8,
+        color: selected ? "#17211e" : "#fffcf8",
+        weight: selected ? 3 : 1.4,
+        fillColor: fill,
+        fillOpacity: 0.86,
+        dashArray: null
+      };
+    }
+
+    function tooltipHtml(city) {
+      if (city.gap) {
+        const contacts = city.contacts === 0 ? "No contacts" : formatNumber(city.contacts) + (city.contacts === 1 ? " contact" : " contacts");
+        return city.city + ", " + city.state + "<br><span>Coverage gap · " + contacts + "</span>";
+      }
+      const stage = dominantStage(city) || "No open stage";
+      return city.city + ", " + city.state + "<br><span>" + formatNumber(city.contacts) + " contacts · " + stage + "</span>";
+    }
+
+    function drawMarkers(list) {
+      layerGroup.clearLayers();
+      const circles = list.filter((city) => !city.gap && (showDensity || showDeals));
+      circles.sort((a, b) => b.contacts - a.contacts);
+
+      circles.forEach((city) => addCityMarker(city));
+
+      if (showGaps) {
+        list.filter((city) => city.gap).forEach((city) => addCityMarker(city));
+      }
+
+      if (showDensity) {
+        list.forEach((city) => {
+          const side = HUBS[city.id];
+          if (!side || city.gap) return;
+          if (!showDensity && !showDeals) return;
+          const gap = radiusFor(city.contacts) + 10;
+          const labelStyle = side === "left"
+            ? "right:" + gap + "px;top:-10px"
+            : side === "above"
+              ? "left:-18px;top:-" + (gap + 14) + "px"
+              : "left:" + gap + "px;top:-10px";
+          const label = L.marker([city.lat, city.lng], {
+            interactive: false,
+            keyboard: false,
+            icon: L.divIcon({
+              className: "hub-label",
+              html: "<span style=\"" + labelStyle + "\">" + city.city + "</span>",
+              iconSize: [0, 0],
+              iconAnchor: [0, 0]
+            })
+          });
+          layerGroup.addLayer(label);
+        });
+      }
+    }
+
+    function addCityMarker(city) {
+      const selected = city.id === selectedId;
+      const marker = L.circleMarker([city.lat, city.lng], markerStyle(city, selected));
+      marker.bindTooltip(tooltipHtml(city), {
+        direction: "top",
+        opacity: 1,
+        className: "tip",
+        offset: [0, -6]
+      });
+      marker.on("mouseover", () => marker.bringToFront());
+      marker.on("click", (event) => {
+        L.DomEvent.stopPropagation(event);
+        selectCity(city.id);
+      });
+      layerGroup.addLayer(marker);
+      if (selected) marker.bringToFront();
+    }
+
+    function renderDetail() {
+      const city = cities.find((item) => item.id === selectedId);
+      if (!city) {
+        detailEl.innerHTML = '<h3>Choose a city</h3><p class="prompt">Click a circle or coverage gap, or search by city.</p>';
+        return;
+      }
+
+      const stage = dominantStage(city);
+      const total = dealTotal(city);
+      const accounts = accountsFor(city);
+      const contactLabel = city.contacts === 1 ? "1 contact" : formatNumber(city.contacts) + " contacts";
+
+      let html = "<h3>" + city.city + "</h3>";
+      html += '<p class="place">' + STATE_NAMES[city.state] + "</p>";
+
+      if (city.gap) {
+        html += '<p class="gap-copy">Coverage gap. This municipal market has little or no active pipeline.</p>';
+      }
+
+      html += '<div class="metrics">';
+      html += "<div><b>" + formatNumber(city.contacts) + "</b><span>Contacts</span></div>";
+      html += "<div><b>" + formatNumber(openDeals(city)) + "</b><span>Open deals</span></div>";
+      html += "<div><b>" + formatNumber(city.deals.Won) + "</b><span>Won</span></div>";
+      html += "</div>";
+
+      if (total > 0) {
+        html += '<div class="bar" aria-hidden="true">';
+        STAGES.forEach((item) => {
+          const value = city.deals[item.id];
+          if (!value) return;
+          html += '<span style="width:' + (value / total * 100) + '%;background:' + item.color + '"></span>';
+        });
+        html += "</div>";
+        html += '<div class="stage-list">';
+        STAGES.forEach((item) => {
+          html += "<div><i style=\"background:" + item.color + ";width:8px;height:8px;border-radius:50%;display:inline-block\"></i><span>" + item.id + "</span><b>" + city.deals[item.id] + "</b></div>";
+        });
+        html += "</div>";
+        if (stage) {
+          html += '<p class="place">Dominant stage: ' + stage + "</p>";
+        }
+      } else {
+        html += "<p class=\"prompt\">No deals on file. " + contactLabel + ".</p>";
+      }
+
+      if (accounts.length) {
+        html += "<ul class=\"accounts\">" + accounts.map((name) => "<li>" + name + "</li>").join("") + "</ul>";
+      }
+
+      detailEl.innerHTML = html;
+    }
+
+    function clearSearch() {
+      query = "";
+      activeResult = 0;
+      searchInput.value = "";
+      renderSearch();
+    }
+
+    function matchingCities() {
+      const q = query.toLowerCase();
+      if (!q) return [];
+      const pool = visibleCities();
+      const starts = [];
+      const rest = [];
+      pool.forEach((city) => {
+        const name = city.city.toLowerCase();
+        const label = (city.city + ", " + city.state).toLowerCase();
+        if (name.startsWith(q)) starts.push(city);
+        else if (name.includes(q) || label.includes(q)) rest.push(city);
+      });
+      return starts.concat(rest).slice(0, 8);
+    }
+
+    function renderSearch() {
+      resultCities = matchingCities();
+      if (!query) {
+        searchResults.hidden = true;
+        searchResults.innerHTML = "";
+        searchInput.setAttribute("aria-expanded", "false");
+        return;
+      }
+
+      if (activeResult >= resultCities.length) activeResult = 0;
+      searchResults.hidden = false;
+      searchInput.setAttribute("aria-expanded", "true");
+
+      if (!resultCities.length) {
+        searchResults.innerHTML = '<p class="prompt" style="margin:8px 10px">No matching city in the current filters.</p>';
+        return;
+      }
+
+      searchResults.innerHTML = resultCities.map((city, index) => {
+        const meta = city.gap ? "Gap" : formatNumber(city.contacts) + " contacts";
+        return '<button type="button" role="option" aria-selected="' + (index === activeResult ? "true" : "false") + '" data-id="' + city.id + '"><span>' + city.city + ", " + city.state + "</span><small>" + meta + "</small></button>";
+      }).join("");
+    }
+
+    function updateEmpty(list) {
+      const drawn = list.some((city) => (city.gap && showGaps) || (!city.gap && (showDensity || showDeals)));
+      if (!list.length) {
+        mapEmpty.hidden = false;
+        mapEmpty.textContent = "No cities match these filters.";
+        return;
+      }
+      if (!drawn) {
+        mapEmpty.hidden = false;
+        mapEmpty.textContent = "Turn on a layer to see cities.";
+        return;
+      }
+      mapEmpty.hidden = true;
+    }
+
+    function applyFilters(options) {
+      const list = visibleCities();
+      if (selectedId && !list.some((city) => city.id === selectedId)) selectedId = null;
+      renderStats(list);
+      drawMarkers(list);
+      renderDetail();
+      renderSearch();
+      sizeKey.classList.toggle("is-off", !showDensity);
+      updateEmpty(list);
+      if (options && options.refit) fit(list);
+    }
+
+    function fit(list) {
+      const boundsList = list && list.length ? list : visibleCities();
+      if (!boundsList.length) return;
+      map.fitBounds(boundsList.map((city) => [city.lat, city.lng]), {
+        padding: [70, 80],
+        maxZoom: 8,
+        animate: motionDuration(0.4) > 0
+      });
+    }
+
+    function selectCity(id) {
+      selectedId = id;
+      const city = cities.find((item) => item.id === id);
+      applyFilters({ refit: false });
+      map.flyTo([city.lat, city.lng], Math.max(map.getZoom(), city.contacts > 25 ? 8 : 9), {
+        duration: motionDuration(0.55)
+      });
+      detailEl.scrollIntoView({ block: "nearest" });
+      searchResults.hidden = true;
+      searchInput.setAttribute("aria-expanded", "false");
+    }
+
+    searchInput.addEventListener("input", () => {
+      query = searchInput.value.trim();
+      activeResult = 0;
+      renderSearch();
+    });
+
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        if (!resultCities.length) return;
+        event.preventDefault();
+        activeResult = event.key === "ArrowDown"
+          ? (activeResult + 1) % resultCities.length
+          : (activeResult - 1 + resultCities.length) % resultCities.length;
+        renderSearch();
+        return;
+      }
+      if (event.key === "Enter" && resultCities[activeResult]) {
+        event.preventDefault();
+        selectCity(resultCities[activeResult].id);
+      }
+      if (event.key === "Escape") {
+        searchResults.hidden = true;
+        searchInput.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    searchResults.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      selectCity(button.getAttribute("data-id"));
+    });
+
+    document.getElementById("reset-filters").addEventListener("click", () => {
+      stateFilter = "ALL";
+      stageFilter = "ALL";
+      selectedId = null;
+      query = "";
+      searchInput.value = "";
+      document.querySelectorAll("#state-filters button, #stage-filters button").forEach((button, index) => {
+        const host = button.parentElement.id;
+        const isAll = button.textContent === "All" || button.textContent === "All stages";
+        if (host === "state-filters") button.setAttribute("aria-pressed", button.textContent === "All" ? "true" : "false");
+        if (host === "stage-filters") button.setAttribute("aria-pressed", isAll ? "true" : "false");
+      });
+      applyFilters({ refit: true });
+    });
+
+    map.on("click", () => {
+      if (!selectedId) return;
+      selectedId = null;
+      applyFilters({ refit: false });
+    });
+
+    buildControls();
+    applyFilters({ refit: false });
+    fit();
+    requestAnimationFrame(() => map.invalidateSize());
+  </script>
+</body>
+</html>
